@@ -17,9 +17,7 @@ extension UITableViewCell {
 class ViewController: UIViewController {
     
     weak var tableViewHeightConstraint: NSLayoutConstraint?
-    
-    var tasks = ["Задание 1", "Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2 Задание 2", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3", "Задание 3"]
-    
+    private var tasks = [Tasks]()
     let smallTitle: UILabel = {
         let label = UILabel()
         label.text = "Выполнено — 5"
@@ -28,13 +26,19 @@ class ViewController: UIViewController {
         return label
     }()
     
-    let showLabel: UILabel = {
-        let label = UILabel()
-        label.text = "Показать"
-        label.font = Fonts.subHeadline
-        label.textColor = Colors.blue
+    let showLabel: UIButton = {
+        let label = UIButton()
+        label.setTitle("reload", for: .normal)
+//        label.font = Fonts.subHeadline!
+        label.setTitleColor(Colors.blue, for: .normal)
+        label.addTarget(self, action: #selector(reloadButtonTapped), for: .touchUpInside)
         return label
     }()
+    
+    @objc func reloadButtonTapped(){
+        taskTableView.reloadData()
+    }
+    
     
     let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
@@ -44,11 +48,9 @@ class ViewController: UIViewController {
     
     let taskTableView: ContentSizedTableView = {
         let tableView = ContentSizedTableView()
-        tableView.backgroundColor = UIColor(hex: "F7F6F2")
-        tableView.bounces = false
         tableView.layer.cornerRadius = 16
         tableView.clipsToBounds = true
-        
+        tableView.isScrollEnabled = false
         return tableView
     }()
     
@@ -56,8 +58,16 @@ class ViewController: UIViewController {
         let button = UIButton()
         let image = UIImage(named: "plus")
         button.setImage(image, for: .normal)
+        button.addTarget(self, action: #selector(plusButtonTapped), for: .touchUpInside)
         return button
     }()
+    
+    @objc func plusButtonTapped(){
+        let newTaskViewController = NewTaskViewController()
+        let navigationController = UINavigationController(rootViewController: newTaskViewController)
+        present(navigationController, animated: true, completion: nil)
+
+    }
     
     
     
@@ -81,10 +91,27 @@ class ViewController: UIViewController {
         taskTableView.delegate = self
         taskTableView.dataSource = self
         taskTableView.register(TaskTableViewCell.self, forCellReuseIdentifier:  TaskTableViewCell.identifier)
-        
+        fetchLocalStorageForDownload()
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("downloaded"), object: nil, queue: nil) { _ in
+            self.fetchLocalStorageForDownload()
+        }
         setupViews()
         setupConstraints()
         
+    }
+    private func fetchLocalStorageForDownload(){
+        DataPersistenceManager.shared.fetchingTasksFromDatabase { [weak self] result in
+            switch result{
+            case .success(let tasks):
+                self?.tasks = tasks
+                DispatchQueue.main.async {
+                    self?.taskTableView.reloadData()
+                }
+            case .failure(let error):
+                print(error.localizedDescription)
+            }
+            
+        }
     }
 }
 
@@ -102,22 +129,26 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
         guard let cell = taskTableView.dequeueReusableCell(withIdentifier: TaskTableViewCell.identifier, for: indexPath) as? TaskTableViewCell else {
             fatalError("Failed to dequeue CharacterTableViewCell")
         }
-        cell.configure(name: tasks[indexPath.row])
+        
+        cell.configure(data: self.tasks[indexPath.row])
+        
+        cell.backgroundColor = Colors.cellsColor
         return cell
     }
     
-    func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 56
-    }
-    
-    func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
-        return true
-    }
-    
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        let deleteAction = UIContextualAction(style: .destructive, title: nil) { (action, view, completion) in
-            // Perform the delete logic here
-            self.deleteCell(at: indexPath)
+        let deleteAction = UIContextualAction(style: .destructive, title: nil) { [self] (action, view, completion) in
+            DataPersistenceManager.shared.deleteTaskWith(model: tasks[indexPath.row]) { [weak self]
+                result in
+                switch result{
+                case.success:
+                    print("Deleted")
+                case.failure(let error):
+                    print(error.localizedDescription)
+                }
+                self?.tasks.remove(at: indexPath.row)
+                tableView.deleteRows(at: [indexPath], with: .fade)
+            }
             
             completion(true)
         }
@@ -126,7 +157,6 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
         deleteAction.image = UIImage(named: "delete")
         
         let infoAction = UIContextualAction(style: .destructive, title: nil) { (action, view, completion) in
-            // Perform the delete logic here
             print("tapped info")
             
             completion(true)
@@ -136,25 +166,23 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
         infoAction.image = UIImage(named: "info")
         
         let configuration = UISwipeActionsConfiguration(actions: [deleteAction, infoAction])
-        configuration.performsFirstActionWithFullSwipe = false // Disable full swipe behavior
-        
+        configuration.performsFirstActionWithFullSwipe = false
         return configuration
-    }
-    func deleteCell(at indexPath: IndexPath) {
-        // Perform the deletion from your data source
-        // For example, if you have an array of items:
-        tasks.remove(at: indexPath.row)
-        
-        // Then, update the table view
-        taskTableView.deleteRows(at: [indexPath], with: .fade)
-
     }
 
     func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         let doneAction = UIContextualAction(style: .normal, title: nil) { (action, view, completion) in
             // Perform the color change logic here
-            self.changeColorForCell(at: indexPath)
-            
+            self.changeDoneColorForCell(at: indexPath)
+            DataPersistenceManager.shared.updateTaskWith(model: self.tasks[indexPath.row]) { [weak self]
+                result in
+                switch result{
+                case.success:
+                    print("done task")
+                case.failure(let error):
+                    print(error.localizedDescription)
+                }
+            }
             completion(true)
         }
         
@@ -167,9 +195,9 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
         return configuration
     }
     
-    func changeColorForCell(at indexPath: IndexPath) {
-        if let cell = taskTableView.cellForRow(at: indexPath) {
-            cell.contentView.backgroundColor = UIColor.green // Set the desired color for the cell
+    func changeDoneColorForCell(at indexPath: IndexPath) {
+        if let cell = taskTableView.cellForRow(at: indexPath) as? TaskTableViewCell {
+            cell.configureDone()
         }
     }
     
@@ -208,7 +236,7 @@ extension ViewController{
             make.height.equalTo(20)
         }
         plusButton.snp.makeConstraints { make in
-            make.bottom.equalToSuperview().inset(54)
+            make.bottom.equalToSuperview().inset(20)
             make.centerX.equalToSuperview()
         }
     }

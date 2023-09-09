@@ -41,9 +41,9 @@ extension UIColor {
 struct Colors {
     static let backroundColor = UIColor(named: "BackroundColor")
     static let bigTextColor = UIColor(named: "TextColor")
-    static let smallTextColor = UIColor(named: "SmallTextColor")
+    static let smallTextColor = UIColor(named: "Gray")
     static let blue = UIColor(named: "Blue")
-    static let tintColor = UIColor(named: "tintColor")
+    static let cellsColor = UIColor(named: "CellsColor")
 }
 
 
