@@ -52,7 +52,6 @@ extension CalendarTableViewCell {
 extension CalendarTableViewCell: UICalendarSelectionSingleDateDelegate {
     func dateSelection(_ selection: UICalendarSelectionSingleDate, didSelectDate dateComponents: DateComponents?) {
         if var d = dateComponents {
-            d.day = d.day!+1
             NewTaskViewController.date = Calendar.current.date(from: d)
         }
         let dateFormatter = DateFormatter()

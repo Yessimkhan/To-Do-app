@@ -19,7 +19,7 @@ class DateTableViewCell: UITableViewCell {
     
     let bigLabel: UILabel = {
         let label = UILabel()
-        label.text = "Сделать до"
+        label.text = "Deadline"
         label.font = Fonts.body
         label.textColor = Colors.bigTextColor
         return label

@@ -47,6 +47,7 @@ class TaskTableViewCell: UITableViewCell {
         label.font = Fonts.subhead
         label.textColor = Colors.smallTextColor
         label.numberOfLines = 0
+        label.minimumScaleFactor = 0.9
         return label
     }()
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
